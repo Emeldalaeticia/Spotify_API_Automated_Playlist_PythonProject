@@ -113,21 +113,7 @@ def get_token():
 
     return token_info
 
-# def get_token():
-#     token_info = session.get(TOKEN_INFO, None)
-#     if not token_info:
-#         # if the token info is not found, redirect  the user to the login route
-#         redirect(url_for('login', _external = False))
 
-#     # check if the token is expired and refresh it if necessary
-#     now = int(time.time())
-
-#     is_expired = token_info('expires_at') - now < 60
-#     if(is_expired):
-#         spotify_oauth = create_spotify_oauth()
-#         token_info = spotify_oauth.refresh_access_token(token_info['refresh_token'])
-
-#     return token_info
 
 def create_spotify_oauth():
     return SpotifyOAuth(
