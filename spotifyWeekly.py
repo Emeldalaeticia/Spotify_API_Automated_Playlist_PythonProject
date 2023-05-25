@@ -62,11 +62,14 @@ def save_discover_weekly():
     discover_weekly_playlist_id = None
     saved_weekly_playlist_id = None
 
-    # find th Discover weekly and saved weekl playlists
+    # find th Discover weekly and saved weekly playlists
     for playlist in current_playlists:
-        if(playlist['name'] == "Discover Weekly"):
+        print(playlist['name'], playlist['id'])
+
+
+        if playlist['name'] == "Discover Weekly":
             discover_weekly_playlist_id = playlist['id']
-        if(playlist['name'] == "Saved Weekly"):
+        if playlist['name'] == "Saved Weekly":
             saved_weekly_playlist_id = playlist['id']
 
     # if the discover weekly playlist is not found, return an error message
@@ -89,28 +92,46 @@ def save_discover_weekly():
     sp.user_playlist_add_tracks(user_id, saved_weekly_playlist_id, song_uris, None)
 
     # return a succes message
-    return ("SUCCESS !!!!")
+    return ("YOU DID IT GUUURLL !!!!")
 
 
+# Function to get the token info from the session
 # Function to get the token info from the session
 def get_token():
     token_info = session.get(TOKEN_INFO, None)
     if not token_info:
-        # if the token info is not found, redirect  the user to the login route
-        redirect(url_for('login', _external = False))
+        # if the token info is not found, redirect the user to the login route
+        return redirect(url_for('login', _external=False))
 
     # check if the token is expired and refresh it if necessary
     now = int(time.time())
 
-    is_expired = token_info('expires_at') - now < 60
-    if(is_expired):
+    is_expired = token_info['expires_at'] - now < 60
+    if is_expired:
         spotify_oauth = create_spotify_oauth()
         token_info = spotify_oauth.refresh_access_token(token_info['refresh_token'])
 
     return token_info
+
+# def get_token():
+#     token_info = session.get(TOKEN_INFO, None)
+#     if not token_info:
+#         # if the token info is not found, redirect  the user to the login route
+#         redirect(url_for('login', _external = False))
+
+#     # check if the token is expired and refresh it if necessary
+#     now = int(time.time())
+
+#     is_expired = token_info('expires_at') - now < 60
+#     if(is_expired):
+#         spotify_oauth = create_spotify_oauth()
+#         token_info = spotify_oauth.refresh_access_token(token_info['refresh_token'])
+
+#     return token_info
+
 def create_spotify_oauth():
     return SpotifyOAuth(
-        client_id = os.environ.get('SPOTIFY_CLIENT_ID'),
+        client_id = '28a4021f82764dd480dc39ccc3b01bd6',
         client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET'),
         redirect_uri = url_for('redirect_page', _external=True),
         scope='user-library-read playlist-modify-public playlist-modify-private'
