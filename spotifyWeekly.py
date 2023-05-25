@@ -1,32 +1,123 @@
+# Import Necessary modules
+import os
+import time
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
-
 from flask import Flask, request, url_for, session, redirect
 
+# Initialize Flask app
 app = Flask(__name__)
 
+# set the name of the session cookie
 app.config['SESSION_COOKIE_NAME'] = 'Spotify Cookie'
+
+# set a random key to sign the cookie
 app.secret_key = 'xnxw83ijr921ed83513f'
+
+# set the key for the token info in the session dictionary
 TOKEN_INFO = 'token_info'
 
-#Creating the home route
+#Route to handle loggin in
 @app.route('/')
 def login():
     auth_url = create_spotify_oauth().get_authorize_url()
     return redirect(auth_url)
 
-# Redirect route
+# Route to handle the redirect URI after authorization
 @app.route('/redirect')
+def redirect_page():
+    # clear the session
+    session.clear()
+    # get the authorization code from the request parameters
+    code = request.args.get('code')
+    # exchange the authorization code for an access token and refresh token
+    token_info = create_spotify_oauth().get_access_token(code)
+    # save the token info in the session
+    session[TOKEN_INFO] = token_info
+    # redirect the user to the save_discover_weekly route
+    return redirect(url_for('save_discover_weekly', _external = True))
 
 # Save Discover weekly playlist route
 @app.route('/saveDiscoverWeekly')
+def save_discover_weekly():
+
+    try:
+        # get the token info frm the session
+        token_info = get_token()
+    except:
+        # if the token info is not found, redirect the user to the login route
+        print('User not loggen in')
+        return redirect("/")
+    
+
+    # create a spotify instance with the access token
+    sp = spotipy.Spotify(auth = token_info['access_token'])
 
 
+    user_id = sp.current_user()['id']
 
+    # get the users's playlist
+    current_playlists = sp.current_user_playlists()['items']
+
+    discover_weekly_playlist_id = None
+    saved_weekly_playlist_id = None
+
+    # find th Discover weekly and saved weekl playlists
+    for playlist in current_playlists:
+        if(playlist['name'] == "Discover Weekly"):
+            discover_weekly_playlist_id = playlist['id']
+        if(playlist['name'] == "Saved Weekly"):
+            saved_weekly_playlist_id = playlist['id']
+
+    # if the discover weekly playlist is not found, return an error message
+    if not discover_weekly_playlist_id:
+        return 'Discover Weekly not found'
+    
+    if not saved_weekly_playlist_id:
+        new_playlist = sp.user_playlist_create(user_id, 'Saved Weekly', True)
+        saved_weekly_playlist_id = new_playlist['id']
+    
+    # get the tracks from the discover weekly playlist
+    discover_weekly_playlist =sp.playlist_items(discover_weekly_playlist_id)
+    song_uris = []
+
+    for song in discover_weekly_playlist['items']:
+        song_uri = song['track']['uri']
+        song_uris.append(song_uri)
+
+    # add teh tracks to the saved weekly playlist
+    sp.user_playlist_add_tracks(user_id, saved_weekly_playlist_id, song_uris, None)
+
+    # return a succes message
+    return ("SUCCESS !!!!")
+
+
+# Function to get the token info from the session
+def get_token():
+    token_info = session.get(TOKEN_INFO, None)
+    if not token_info:
+        # if the token info is not found, redirect  the user to the login route
+        redirect(url_for('login', _external = False))
+
+    # check if the token is expired and refresh it if necessary
+    now = int(time.time())
+
+    is_expired = token_info('expires_at') - now < 60
+    if(is_expired):
+        spotify_oauth = create_spotify_oauth()
+        token_info = spotify_oauth.refresh_access_token(token_info['refresh_token'])
+
+    return token_info
 def create_spotify_oauth():
-    return SpotifyOAuth( 
-        client_id = "28a4021f82764dd480dc39ccc3b01bd6",
-        client_secret = "2501136b78674124bc4199a75705a4da",
-        redirect_uri = url_for('redirect'), _external = True,
-        scope = 'user-library-read playlist-modify-public paylist-modify-private'
-        )
+    return SpotifyOAuth(
+        client_id = os.environ.get('SPOTIFY_CLIENT_ID'),
+        client_secret = os.environ.get('SPOTIFY_CLIENT_SECRET'),
+        redirect_uri = url_for('redirect_page', _external=True),
+        scope='user-library-read playlist-modify-public playlist-modify-private'
+    )
+
+print("SPOTIFY_CLIENT_ID:", os.environ.get('SPOTIFY_CLIENT_ID'))  # Add print statement
+print("SPOTIFY_CLIENT_SECRET:", os.environ.get('SPOTIFY_CLIENT_SECRET'))  # Add print statement
+
+
+app.run(debug = True)
